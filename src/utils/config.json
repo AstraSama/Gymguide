@@ -1,0 +1,28 @@
+{
+  "camera": {
+    "source": 0,
+    "width": 640,
+    "height": 480
+  },
+  "pushup_counter": {
+    "threshold_down": 0.6,
+    "threshold_up": 0.4
+  },
+  "utility_function": {
+    "weights": {
+      "muscle_performance": 0.4,
+      "exercise_efficiency": 0.3,
+      "injury_risk": 0.3
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "pushup_mvp.log"
+  },
+  "models": {
+    "pose": {
+      "min_detection_confidence": 0.5,
+      "min_tracking_confidence": 0.5
+    }
+  }
+}

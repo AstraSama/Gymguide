@@ -1,1 +1,5 @@
 # Gymguide
+
+extensions:
+    python;
+    jupyter;
