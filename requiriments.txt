@@ -1,3 +1,0 @@
-opencv-python
-mediapipe
-AIzaSyDExsNsRJmlI4l6Uax61KJ9iU0QSh9TFaY
