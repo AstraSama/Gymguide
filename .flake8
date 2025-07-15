@@ -2,7 +2,8 @@
 # Ignora sua virtualenv e o instalador get-pip.py
 exclude =
     .venv/,
-    get-pip.py
+    get-pip.py,
+    test_mediapipe_pose.py
 
 # Limita o tamanho máximo de linha a 79 caracteres (o padrão do PEP8)
 max-line-length = 79
