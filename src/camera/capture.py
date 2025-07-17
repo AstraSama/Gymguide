@@ -8,7 +8,7 @@ class Camera:
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     def read(self):
-        """Retorna (ok, frame)"""
+        # Retorna (bool, frame)
         return self.cap.read()
 
     def release(self):
