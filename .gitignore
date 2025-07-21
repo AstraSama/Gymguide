@@ -37,7 +37,6 @@ env/
 
 # VSCode
 .vscode/
-/data/sample_videos/video_dowloader_yt.py
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
