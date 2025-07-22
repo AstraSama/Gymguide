@@ -5,31 +5,16 @@ from processing.pushup_counter import PushupCounter
 import csv
 import math
 import os
-from datetime import datetime
+import numpy as np
 
-# Constantes de pontos do corpo
 LEFT_SHOULDER = 11
 LEFT_ELBOW = 13
 LEFT_WRIST = 15
 
 
-# Garante que a pasta exista
-os.makedirs('data', exist_ok=True)
-
-# Gera nome único baseado no horário
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-csv_path = f"data/training_data_{timestamp}.csv"
-
-# Abre novo arquivo CSV
-csv_file = open(csv_path, 'w', newline='')
-
-# Cria o writer e escreve o cabeçalho
-writer = csv.writer(csv_file)
-writer.writerow(['angle', 'label'])
-
-
 def calculate_elbow_angle(landmarks):
-    """Calcula o ângulo entre ombro, cotovelo e punho esquerdo"""
+    if len(landmarks) <= LEFT_WRIST:
+        return 0
     a = landmarks[LEFT_SHOULDER]
     b = landmarks[LEFT_ELBOW]
     c = landmarks[LEFT_WRIST]
@@ -47,27 +32,31 @@ def calculate_elbow_angle(landmarks):
 
 def main():
     if len(sys.argv) < 2:
-        print("Uso: python main.py caminho/do/video.mp4")
+        print("Uso: python main.py caminho/do/video.mp4 [modo: lateral|frontal]")
         return
 
     video_path = sys.argv[1]
-    counter = PushupCounter()
-
-    mp_pose = mp.solutions.pose
-    mp_drawing = mp.solutions.drawing_utils
-
-    pose = mp_pose.Pose(static_image_mode=False,
-                        model_complexity=1,
-                        enable_segmentation=False,
-                        min_detection_confidence=0.5,
-                        min_tracking_confidence=0.5)
+    mode = 'lateral'  # padrão
+    if len(sys.argv) >= 3:
+        mode_arg = sys.argv[2].lower()
+        if mode_arg in ['lateral', 'frontal']:
+            mode = mode_arg
+        else:
+            print(f"Modo '{mode_arg}' inválido, usando padrão 'lateral'.")
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print(f"Erro ao abrir o vídeo: {video_path}")
         return
 
-    cv2.namedWindow("Push-up Counter", cv2.WINDOW_NORMAL)
+    mp_pose = mp.solutions.pose
+    mp_drawing = mp.solutions.drawing_utils
+    pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+    angle_list = []
+    counter = PushupCounter(mode=mode)
+
+    cv2.namedWindow("Push-up Collector", cv2.WINDOW_NORMAL)
 
     while True:
         ret, frame = cap.read()
@@ -78,43 +67,61 @@ def main():
         results = pose.process(frame_rgb)
 
         if results.pose_landmarks:
-            # Desenha os pontos e conexões
-            mp_drawing.draw_landmarks(
-                frame,
-                results.pose_landmarks,
-                mp_pose.POSE_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=3),
-                mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=2)
-            )
+            landmarks = results.pose_landmarks.landmark
+            angle = calculate_elbow_angle(landmarks)
+            angle_list.append(angle)
 
-            # Atualiza contador
+            # Atualiza repetições
             count = counter.update(results.pose_landmarks)
-            cv2.putText(frame, f"Pushups: {count}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-            # Calcula ângulo do cotovelo
-            angle = calculate_elbow_angle(results.pose_landmarks.landmark)
+            # Desenha pontos e conexões
+            mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+            cv2.putText(frame, f"Angle: {int(angle)}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+            cv2.putText(frame, f"Reps: {count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(frame, f"Mode: {mode}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
 
-            # Exibe ângulo na tela
-            cv2.putText(frame, f"Elbow Angle: {int(angle)}", (10, 70),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
-
-        cv2.imshow("Push-up Counter", frame)
+        cv2.imshow("Push-up Collector", frame)
         key = cv2.waitKey(1) & 0xFF
 
         if key == ord('q'):
             break
-        elif key == ord('b') and results.pose_landmarks:
-            writer.writerow([angle, 1])  # Bom exemplo
-            print(f"Salvo: Bom ({angle:.2f})")
-        elif key == ord('r') and results.pose_landmarks:
-            writer.writerow([angle, 0])  # Ruim
-            print(f"Salvo: Ruim ({angle:.2f})")
+        elif key in [ord('b'), ord('r')]:
+            label = 1 if key == ord('b') else 0
+            if angle_list:
+                np_angles = np.array(angle_list)
+                row = [
+                    np.mean(np_angles),
+                    np.std(np_angles),
+                    np.min(np_angles),
+                    np.max(np_angles),
+                    np.max(np_angles) - np.min(np_angles),  # amplitude
+                    counter.count,
+                    label
+                ]
+
+                os.makedirs('data', exist_ok=True)
+                csv_name = "training_data_stats.csv"
+                csv_exists = os.path.exists(f"data/{csv_name}")
+
+                with open(f"data/{csv_name}", 'a', newline='') as f:
+                    writer = csv.writer(f)
+                    if not csv_exists:
+                        writer.writerow(['mean', 'std', 'min', 'max', 'amplitude', 'reps', 'label'])
+                    writer.writerow(row)
+
+                print(f"Salvo! Label: {'Bom' if label else 'Ruim'} — {row}")
+
+                # Reinicia para próxima coleta
+                angle_list = []
+                counter.count = 0
+                counter.state = 'down'  # reset estado do contador
+
+            else:
+                print("Nenhum ângulo coletado!")
 
     cap.release()
     cv2.destroyAllWindows()
     pose.close()
-    csv_file.close()
 
 
 if __name__ == "__main__":
