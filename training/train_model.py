@@ -13,7 +13,8 @@ def main():
         print("Nenhum arquivo de treino encontrado.")
         exit()
 
-    df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+    columns = ['mean', 'std', 'min', 'max', 'amplitude', 'reps', 'label']
+    df = pd.concat([pd.read_csv(f, names=columns) for f in files], ignore_index=True)
 
     print("Amostras carregadas:", len(df))
     print("Exemplo dos dados:")

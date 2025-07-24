@@ -32,7 +32,7 @@ def calculate_elbow_angle(landmarks):
 
 def main():
     if len(sys.argv) < 2:
-        print("Uso: python main.py caminho/do/video.mp4 [modo: lateral|frontal]")
+        print("Uso: python3 src/main.py caminho/do/video.mp4 [modo: lateral|frontal]")
         return
 
     video_path = sys.argv[1]
