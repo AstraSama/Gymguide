@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 
 # Adiciona o diretório 'src' ao sys.path
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -14,8 +15,8 @@ import math
 import numpy as np
 
 from processing.pushup_counter import PushupCounter
+from llm_feedback import gerar_feedback  # <-- novo
 
-# Pontos do corpo
 LEFT_SHOULDER = 11
 LEFT_ELBOW = 13
 LEFT_WRIST = 15
@@ -38,12 +39,11 @@ def calculate_elbow_angle(landmarks):
 
 
 def main(video_path):
-    # Carrega modelo treinado
+    print(f"🎬 Iniciando análise do vídeo: {video_path}")
+    counter = PushupCounter(mode='lateral')  # ou 'lateral'
     model = joblib.load('angle_quality_model.pkl')
-
-    counter = PushupCounter()
     angles = []
-    predicted_label = None  # só fazemos a previsão uma vez
+    predicted_label = None
 
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
@@ -75,7 +75,6 @@ def main(video_path):
 
             reps = counter.update(results.pose_landmarks)
 
-            # Se ainda não foi prevista e já temos repetições suficientes
             if predicted_label is None and reps >= 3 and len(angles) >= 5:
                 features = {
                     'mean': np.mean(angles),
@@ -93,15 +92,29 @@ def main(video_path):
                 prediction = model.predict(X_input)[0]
                 predicted_label = "Bom" if prediction == 1 else "Ruim"
 
+                # Salvar dados e enviar ao LLM
+                dados = {
+                    "video_path": video_path,
+                    "mode": counter.mode,  # novo!
+                    **features,
+                    "classificacao": predicted_label,
+                    "angle_list": angles[-30:]
+                }
+
+
+                with open("data/last_analysis.json", "w") as f:
+                    json.dump(dados, f, indent=2)
+
+                print("⚙️ Chamando gerar_feedback()...")
+                feedback = gerar_feedback(dados)
+                print("\n💬 Feedback gerado pelo agente:\n")
+                print(feedback)
+                print("\n" + "="*60 + "\n")
+
             # Desenhos
-            mp_drawing.draw_landmarks(
-                frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-
-            cv2.putText(frame, f"Angle: {int(angle)}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
-
-            cv2.putText(frame, f"Repetições: {reps}", (10, 70),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (200, 255, 255), 2)
+            mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+            cv2.putText(frame, f"Angle: {int(angle)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+            cv2.putText(frame, f"Repetições: {reps}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (200, 255, 255), 2)
 
             if predicted_label:
                 cv2.putText(frame, f"Classificação: {predicted_label}", (10, 110),
@@ -118,6 +131,49 @@ def main(video_path):
     cap.release()
     pose.close()
     cv2.destroyAllWindows()
+
+    # ⚠️ Gera feedback mesmo que reps < 3
+    print("⚠️ Vídeo terminou. Verificando se é possível gerar feedback com dados disponíveis...")
+
+    if predicted_label is None and len(angles) >= 5:
+        print("✅ Entrou no bloco de feedback final.")
+        features = {
+            'mean': np.mean(angles),
+            'std': np.std(angles),
+            'min': np.min(angles),
+            'max': np.max(angles),
+            'amplitude': np.max(angles) - np.min(angles),
+            'reps': counter.count
+        }
+        print(f"📊 Features calculadas: {features}")
+
+        X_input = [[
+            features['mean'], features['std'], features['min'],
+            features['max'], features['amplitude'], features['reps']
+        ]]
+        prediction = model.predict(X_input)[0]
+        predicted_label = "Bom" if prediction == 1 else "Ruim"
+        print(f"🧠 Predição feita: {predicted_label}")
+
+        dados = {
+            "video_path": video_path,
+            "mode": counter.mode,
+            **features,
+            "classificacao": predicted_label,
+            "angle_list": angles[-30:]
+        }
+
+        with open("data/last_analysis.json", "w") as f:
+            json.dump(dados, f, indent=2)
+        print("💾 Arquivo last_analysis.json salvo com sucesso.")
+
+        # feedback = gerar_feedback(dados)
+        feedback = "🔁 Simulação de feedback: tudo rodando até aqui!"
+        print("\n💬 Feedback gerado pelo agente:\n")
+        print(feedback)
+        print("\n" + "=" * 60 + "\n")
+    else:
+        print("❗ Não houve dados suficientes para gerar feedback.")
 
 
 if __name__ == "__main__":
