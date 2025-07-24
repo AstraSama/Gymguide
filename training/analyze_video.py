@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import pandas as pd
 
 # Adiciona o diretório 'src' ao sys.path
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -40,8 +41,8 @@ def calculate_elbow_angle(landmarks):
 
 def main(video_path):
     print(f"🎬 Iniciando análise do vídeo: {video_path}")
-    counter = PushupCounter(mode='lateral')  # ou 'lateral'
-    model = joblib.load('angle_quality_model.pkl')
+    counter = PushupCounter(mode='lateral')  # ou 'lateral', ou 'frontal'
+    model = joblib.load('pushup_quality_model.pkl')
     angles = []
     predicted_label = None
 
@@ -60,11 +61,15 @@ def main(video_path):
 
     cv2.namedWindow("Análise de Push-up", cv2.WINDOW_NORMAL)
 
+    feature_cols = ['mean', 'std', 'min', 'max', 'amplitude', 'reps']
+    frame_count = 0
     while True:
         ret, frame = cap.read()
         if not ret:
+            print("❌ Falha ao ler frame. Encerrando loop.")
             break
 
+        frame_count += 1
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = pose.process(frame_rgb)
 
@@ -85,11 +90,12 @@ def main(video_path):
                     'reps': reps
                 }
 
-                X_input = [[
+                X_input = pd.DataFrame([[
                     features['mean'], features['std'], features['min'],
                     features['max'], features['amplitude'], features['reps']
-                ]]
+                ]], columns=feature_cols)
                 prediction = model.predict(X_input)[0]
+
                 predicted_label = "Bom" if prediction == 1 else "Ruim"
 
                 # Salvar dados e enviar ao LLM
@@ -128,6 +134,8 @@ def main(video_path):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    print("🎞️ Total de frames no vídeo:", int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
+
     cap.release()
     pose.close()
     cv2.destroyAllWindows()
@@ -147,10 +155,11 @@ def main(video_path):
         }
         print(f"📊 Features calculadas: {features}")
 
-        X_input = [[
-            features['mean'], features['std'], features['min'],
-            features['max'], features['amplitude'], features['reps']
-        ]]
+
+        X_input = pd.DataFrame([[
+                features['mean'], features['std'], features['min'],
+                features['max'], features['amplitude'], features['reps']
+            ]], columns=feature_cols)
         prediction = model.predict(X_input)[0]
         predicted_label = "Bom" if prediction == 1 else "Ruim"
         print(f"🧠 Predição feita: {predicted_label}")
@@ -167,8 +176,8 @@ def main(video_path):
             json.dump(dados, f, indent=2)
         print("💾 Arquivo last_analysis.json salvo com sucesso.")
 
-        # feedback = gerar_feedback(dados)
-        feedback = "🔁 Simulação de feedback: tudo rodando até aqui!"
+        feedback = gerar_feedback(dados)
+        # feedback = "🔁 Simulação de feedback: tudo rodando até aqui!"
         print("\n💬 Feedback gerado pelo agente:\n")
         print(feedback)
         print("\n" + "=" * 60 + "\n")

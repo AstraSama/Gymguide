@@ -11,7 +11,7 @@ else:
     print("🔐 GOOGLE_API_KEY carregada com sucesso.")
 
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 
 def gerar_feedback(dados):
@@ -35,6 +35,7 @@ Dado o modo {dados['mode']}, ajuste as dicas conforme o ângulo (modo lateral) o
 """
 
     try:
+        # 2. Chame a API uma única vez com o prompt
         response = model.generate_content(prompt)
         print("✅ Resposta recebida do Gemini.")
         return response.text.strip()
