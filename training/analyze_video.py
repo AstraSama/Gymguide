@@ -1,3 +1,4 @@
+import mediapipe as mp
 import os
 import sys
 import json
@@ -10,7 +11,6 @@ if SRC_DIR not in sys.path:
 
 # flake8: noqa: E402
 import cv2
-import mediapipe as mp
 import joblib
 import math
 import numpy as np
@@ -80,42 +80,42 @@ def main(video_path):
 
             reps = counter.update(results.pose_landmarks)
 
-            if predicted_label is None and reps >= 3 and len(angles) >= 5:
-                features = {
-                    'mean': np.mean(angles),
-                    'std': np.std(angles),
-                    'min': np.min(angles),
-                    'max': np.max(angles),
-                    'amplitude': np.max(angles) - np.min(angles),
-                    'reps': reps
-                }
+            # if predicted_label is None and reps >= 3 and len(angles) >= 5:
+            #     features = {
+            #         'mean': np.mean(angles),
+            #         'std': np.std(angles),
+            #         'min': np.min(angles),
+            #         'max': np.max(angles),
+            #         'amplitude': np.max(angles) - np.min(angles),
+            #         'reps': reps
+            #     }
 
-                X_input = pd.DataFrame([[
-                    features['mean'], features['std'], features['min'],
-                    features['max'], features['amplitude'], features['reps']
-                ]], columns=feature_cols)
-                prediction = model.predict(X_input)[0]
+            #     X_input = pd.DataFrame([[
+            #         features['mean'], features['std'], features['min'],
+            #         features['max'], features['amplitude'], features['reps']
+            #     ]], columns=feature_cols)
+            #     prediction = model.predict(X_input)[0]
 
-                predicted_label = "Bom" if prediction == 1 else "Ruim"
+            #     predicted_label = "Bom" if prediction == 1 else "Ruim"
 
-                # Salvar dados e enviar ao LLM
-                dados = {
-                    "video_path": video_path,
-                    "mode": counter.mode,  # novo!
-                    **features,
-                    "classificacao": predicted_label,
-                    "angle_list": angles[-30:]
-                }
+            #     # Salvar dados e enviar ao LLM
+            #     dados = {
+            #         "video_path": video_path,
+            #         "mode": counter.mode,  # novo!
+            #         **features,
+            #         "classificacao": predicted_label,
+            #         "angle_list": angles[-30:]
+            #     }
 
 
-                with open("data/last_analysis.json", "w") as f:
-                    json.dump(dados, f, indent=2)
+            #     with open("data/last_analysis.json", "w") as f:
+            #         json.dump(dados, f, indent=2)
 
-                print("⚙️ Chamando gerar_feedback()...")
-                feedback = gerar_feedback(dados)
-                print("\n💬 Feedback gerado pelo agente:\n")
-                print(feedback)
-                print("\n" + "="*60 + "\n")
+            #     print("⚙️ Chamando gerar_feedback()...")
+            #     feedback = gerar_feedback(dados)
+            #     print("\n💬 Feedback gerado pelo agente:\n")
+            #     print(feedback)
+            #     print("\n" + "="*60 + "\n")
 
             # Desenhos
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
