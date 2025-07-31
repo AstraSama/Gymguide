@@ -7,3 +7,4 @@ joblib==1.2.0
 yt_dlp
 google.generativeai
 python-dotenv
+pymongo

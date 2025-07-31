@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import pandas as pd
+from db.conn import collection
 
 # Adiciona o diretório 'src' ao sys.path
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -80,7 +81,7 @@ def main(video_path):
 
             reps = counter.update(results.pose_landmarks)
 
-            # if predicted_label is None and reps >= 3 and len(angles) >= 5:
+            # if predicted_label is None and reps >= 3 and len(angles) >= 5: # para testes 
             #     features = {
             #         'mean': np.mean(angles),
             #         'std': np.std(angles),
@@ -172,9 +173,13 @@ def main(video_path):
             "angle_list": angles[-30:]
         }
 
-        with open("data/last_analysis.json", "w") as f:
-            json.dump(dados, f, indent=2)
-        print("💾 Arquivo last_analysis.json salvo com sucesso.")
+        dados["timestamp"] = pd.Timestamp.now().isoformat()  
+        collection.insert_one(dados)
+        print("✅ Análise salva no MongoDB com sucesso.")
+        
+        # with open("data/last_analysis.json", "w") as f:
+        #     json.dump(dados, f, indent=2)
+        # print("💾 Arquivo last_analysis.json salvo com sucesso.")
 
         feedback = gerar_feedback(dados)
         # feedback = "🔁 Simulação de feedback: tudo rodando até aqui!"
